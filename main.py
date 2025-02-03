@@ -14,16 +14,16 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("JAV 封面视频整理小工具")
 
         # Drag and Drop Area for Sorting Files
-        self.move_folder_frame = DragDropFrame(400, 100, 'red')
+        self.move_folder_frame = DragDropFrame(400, 120, 'red')
         self.move_folder_frame.setHandler(self.on_drop_for_put_into_folders)
-        self.sort_drop_label = QLabel("选择多个视频和封面图拖拽到这里，整理成每个文件夹", self.move_folder_frame)
+        self.sort_drop_label = QLabel("拖拽多个视频和封面图\n会把每个视频整理成独立文件夹", self.move_folder_frame)
         self.sort_drop_layout = QVBoxLayout(self.move_folder_frame)
         self.sort_drop_layout.addWidget(self.sort_drop_label)
 
         # Drag and Drop Area for Moving Files to Parent
-        self.flatten_folder_frame = DragDropFrame(400, 100, 'green')
+        self.flatten_folder_frame = DragDropFrame(400, 120, 'green')
         self.flatten_folder_frame.setHandler(self.on_drop_for_remove_folders)
-        self.move_drop_label = QLabel("拖拽一个或多个文件，会把该文件同级的\n所有文件夹内的视频和封面图平铺开，并移除这些文件夹", self.flatten_folder_frame)
+        self.move_drop_label = QLabel("拖拽一个或多个文件\n会把同级全部视频文件夹内容平铺开", self.flatten_folder_frame)
         self.move_drop_layout = QVBoxLayout(self.flatten_folder_frame)
         self.move_drop_layout.addWidget(self.move_drop_label)
 
@@ -143,7 +143,7 @@ class MainWindow(QMainWindow):
             return folder_name
 
         def get_video_prefix(video):
-            filename = file_utils.filename(video)
+            filename = file_utils.filename(video).lower()
             # remove leading bracket and everything in it
             if filename.startswith('['):
                 closing_bracket_index = filename.find(']')
@@ -155,7 +155,12 @@ class MainWindow(QMainWindow):
                 if closing_bracket_index != -1:
                     filename = filename[closing_bracket_index + 1:]
                     print(f'cleaned filename = {filename}')
-            return filename[:prefix_len].lower()
+            common_patterns = ['hhd800.com@', '[thz.la]', '4k2.com@']
+            # removing common
+            for pattern in common_patterns:
+                if pattern in filename:
+                    filename = filename.replace(pattern, '')
+            return filename[:prefix_len]
 
         # Iterate over each image file
         for image in image_files:
