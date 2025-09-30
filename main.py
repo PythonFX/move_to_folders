@@ -4,6 +4,9 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QFrame, QLabel, QLineEdit
 from PyQt5.QtCore import Qt
 from drag_drop_frame import DragDropFrame
 import file_utils
+from service.organize_file_service import OrganizeFileService
+from service.rename_service import RenameService
+from service.actors_service import ActorsService
 
 
 
@@ -11,7 +14,20 @@ import file_utils
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.default_path = '/Users/vincent/Downloads/bus_new_download'
         self.setWindowTitle("JAV 封面视频整理小工具")
+
+        # Services
+        self.organize_file_service = OrganizeFileService()
+        self.rename_service = RenameService()
+        self.actors_service = ActorsService()
+
+        # Rename Video File Names
+        self.rename_video_frame = DragDropFrame(400, 100, 'purple')
+        self.rename_video_frame.setHandler(self.on_drop_for_rename_video_files)
+        self.rename_video_label = QLabel("将选中文件中的视频文件名，做清洁化", self.rename_video_frame)
+        self.rename_video_layout = QVBoxLayout(self.rename_video_frame)
+        self.rename_video_layout.addWidget(self.rename_video_label)
 
         # Drag and Drop Area for Sorting Files
         self.move_folder_frame = DragDropFrame(400, 100, 'red')
@@ -29,6 +45,7 @@ class MainWindow(QMainWindow):
 
         # Folder Path Input
         self.folder_path_entry = QLineEdit(self)
+        self.folder_path_entry.setText(self.default_path)
 
         # Button to process files in folder
         self.process_button = QPushButton("整理到各个文件夹", self)
@@ -44,6 +61,7 @@ class MainWindow(QMainWindow):
 
         # Set layout
         layout = QVBoxLayout()
+        layout.addWidget(self.rename_video_frame)
         layout.addWidget(self.move_folder_frame)
         layout.addWidget(self.flatten_folder_frame)
         layout.addWidget(self.folder_path_entry)
@@ -73,10 +91,15 @@ class MainWindow(QMainWindow):
         elif self.flatten_folder_frame.underMouse():
             self.on_drop_for_remove_folders(event)
 
+    def on_drop_for_rename_video_files(self, event):
+        file_paths = event.mimeData().urls()
+        file_paths = [path.toLocalFile() for path in file_paths]
+        self.rename_service.rename_files(file_paths)
+
     def on_drop_for_put_into_folders(self, event):
         file_paths = event.mimeData().urls()
         file_paths = [path.toLocalFile() for path in file_paths]
-        self.sort_and_organize_files(file_paths)
+        self.organize_file_service.sort_and_organize_files(file_paths)
 
     def on_drop_for_remove_folders(self, event):
         file_path = event.mimeData().urls()[0].toLocalFile()
@@ -88,7 +111,7 @@ class MainWindow(QMainWindow):
         if os.path.isdir(folder_path):
             file_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if
                           os.path.isfile(os.path.join(folder_path, f))]
-            self.sort_and_organize_files(file_paths)
+            self.organize_file_service.sort_and_organize_files(file_paths)
         else:
             print("Invalid folder path")
 
@@ -106,86 +129,6 @@ class MainWindow(QMainWindow):
         all_paths.sort()
         for path in all_paths:
             print(path)
-
-    def sort_and_organize_files(self, file_paths):
-        # ignore folder path
-        file_paths = [path for path in file_paths if not os.path.isdir(path)]
-
-        # Define the file extensions for videos and images
-        video_extensions = ['mp4', 'mkv', 'avi', 'm4v', 'wmv', 'mov', 'flv', 'webm']
-        image_extensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
-
-        # Separate the file paths into videos and images
-        video_files = [file for file in file_paths if file_utils.extension(file).lower() in video_extensions]
-        image_files = [file for file in file_paths if file_utils.extension(file).lower() in image_extensions]
-
-        # Function to create a directory if it doesn't exist
-        def create_dir_if_not_exists(dir_name):
-            if not os.path.exists(dir_name):
-                os.makedirs(dir_name)
-
-        # Function to move a file using os.rename
-        def move_file(file_path, target_dir):
-            target_path = os.path.join(target_dir, file_utils.full_filename(file_path))
-            os.rename(file_path, target_path)
-
-        def get_folder_name(s, is_4k):
-            last_dot_index = s.rfind('.')
-            if last_dot_index != -1:
-                folder_name = s[:last_dot_index]
-            else:
-                folder_name = s
-            if is_4k:
-                first_space_index = folder_name.find(' ')
-                if first_space_index != -1:
-                    # insert '[4K]' at position first_space_index
-                    folder_name = folder_name[:first_space_index] + '[4K]' + folder_name[first_space_index:]
-            return folder_name
-
-        def get_video_prefix(video):
-            filename = file_utils.filename(video)
-            # remove leading bracket and everything in it
-            if filename.startswith('['):
-                closing_bracket_index = filename.find(']')
-                if closing_bracket_index != -1:
-                    filename = filename[closing_bracket_index + 1:]
-                    print(f'cleaned filename = {filename}')
-            if filename.startswith('【'):
-                closing_bracket_index = filename.find('】')
-                if closing_bracket_index != -1:
-                    filename = filename[closing_bracket_index + 1:]
-                    print(f'cleaned filename = {filename}')
-            return filename[:prefix_len].lower()
-
-        # Iterate over each image file
-        for image in image_files:
-            image_name = file_utils.full_filename(image)
-            first_space_idx = image_name.find(' ')
-            if first_space_idx == -1:
-                prefix_len = 8  # like ABP-986
-            else:
-                prefix_len = first_space_idx
-            image_prefix = image_name.split('.')[0][:prefix_len].lower()
-            print(f'image_prefix = {image_prefix}')
-            found_video = False
-
-            # Iterate over each video file to find a match
-            for video in video_files:
-                video_prefix = get_video_prefix(video)
-                print(f'video_prefix = {video_prefix}')
-                if image_prefix == video_prefix:
-                    folder_name = get_folder_name(os.path.basename(image), '4k' in video)
-                    parent_folder_path = os.path.dirname(image)
-                    folder_path = os.path.join(parent_folder_path, folder_name)
-                    create_dir_if_not_exists(folder_path)
-                    move_file(image, folder_path)
-                    move_file(video, folder_path)
-                    video_files.remove(video)
-                    found_video = True
-                    break
-
-            if not found_video:
-                print(f'No video found for {os.path.basename(image)}')
 
     def move_files_to_parent_and_remove_subfolders(self, path):
         # Check if the path is valid
