@@ -58,6 +58,19 @@ class MainWindow(QMainWindow):
         # Button to process files in folder
         self.print_folder_contents_button = QPushButton("输出该文件夹下的全部内容", self)
         self.print_folder_contents_button.clicked.connect(self.on_print_folder_contents)
+        
+        # Button to start move video folders in current workspace
+        self.start_move_video_folders_button = QPushButton("开始移动视频文件夹们", self)
+        self.start_move_video_folders_button.clicked.connect(self.on_start_move_videos_btn_click)
+        
+        self.current_process_video_label = QLabel("当前待移动的视频名称")
+        self.current_process_video_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.current_video_actor_entry = QLineEdit(self)
+        self.current_video_actor_entry.setText("当前演员名")
+        self.confirm_move_button = QPushButton("确认移动视频", self)
+        self.confirm_move_button.clicked.connect(self.on_confirm_move_video_btn_click)
+        self.cancel_move_button = QPushButton("跳过该视频", self)
+        self.cancel_move_button.clicked.connect(self.on_cancel_move_video_btn_click)
 
         # Set layout
         layout = QVBoxLayout()
@@ -68,6 +81,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.process_button)
         layout.addWidget(self.remove_folder_button)
         layout.addWidget(self.print_folder_contents_button)
+        layout.addWidget(self.start_move_video_folders_button)
+        layout.addWidget(self.current_process_video_label)
+        layout.addWidget(self.current_video_actor_entry)
+        layout.addWidget(self.confirm_move_button)
+        layout.addWidget(self.cancel_move_button)
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
@@ -129,6 +147,32 @@ class MainWindow(QMainWindow):
         all_paths.sort()
         for path in all_paths:
             print(path)
+            
+    def on_start_move_videos_btn_click(self):
+        print('on_start_move_videos_btn_click')
+        folder_path = self.folder_path_entry.text()
+        if os.path.isdir(folder_path):
+            folder_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if
+                            os.path.isdir(os.path.join(folder_path, f))]
+            self.organize_file_service.start_move_video_folder(folder_paths,
+                                                               self.current_process_video_label,
+                                                               self.current_video_actor_entry)
+        else:
+            print("Invalid folder path")
+
+    def on_confirm_move_video_btn_click(self):
+        print('move video')
+        folder_path = self.folder_path_entry.text()
+        if os.path.isdir(folder_path):
+            actor_name = self.current_video_actor_entry.text()
+            video_name = self.current_process_video_label.text()
+            self.organize_file_service.confirm_move_video_folder(
+                video_name, actor_name, folder_path, self.current_video_actor_entry)
+        else:
+            print("Invalid folder path")
+        
+    def on_cancel_move_video_btn_click(self):
+        print('cancel move video')
 
     def move_files_to_parent_and_remove_subfolders(self, path):
         # Check if the path is valid
