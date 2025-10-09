@@ -81,6 +81,7 @@ def copy_dir_to_parent_folder(dir_path, target_dir):
     shutil.copytree(dir_path, target_path)
 
 
+# this is redundant, could just use shutil.move(dir_path, target_dir)
 def move_dir_to_parent_folder(dir_path, target_dir):
     target_path = os.path.join(target_dir, filename(dir_path))
     shutil.move(dir_path, target_path)

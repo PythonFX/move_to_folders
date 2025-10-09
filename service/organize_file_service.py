@@ -52,7 +52,7 @@ class OrganizeFileService:
         for folder_path in folder_paths:
             if folder_path in self.processed_folders:
                 continue
-            folder_name = file_utils.filename(folder_path)
+            folder_name = file_utils.full_filename(folder_path)
             has_found_actor = False
             self.processed_folders.add(folder_path)
             video_label.setText(folder_name)
@@ -71,7 +71,9 @@ class OrganizeFileService:
     
     def confirm_move_video_folder(self, folder_name: str, actor_name: str, source_parent_folder: str, actor_entry):
         # check actor name is valid
-        if '==' in actor_name:
+        if actor_name == '0':
+            actor_name = '==合集=='
+        if '==合集==' != actor_name and '==' in actor_name:
             print('actor name invalid')
             return
         if actor_name not in self.actor_names:
@@ -92,6 +94,7 @@ class OrganizeFileService:
         target_path = os.path.join(target_parent_path, folder_name)
         if os.path.exists(target_path):
             print('[ERROR] target video folder exists! No Move!')
+            actor_entry.setText('==[ERROR] Exist==')
             return
         shutil.move(source_video_folder_path, target_parent_path)
         actor_entry.setText('==Move Finish==')
@@ -166,12 +169,16 @@ class OrganizeFileService:
                 video_prefix = get_video_prefix(video)
                 print(f'video_prefix = {video_prefix}')
                 if image_prefix == video_prefix:
-                    folder_name = get_folder_name(os.path.basename(image), file_utils.is_4k_video(video))
+                    image_file_name = os.path.basename(image)
+                    folder_name = get_folder_name(image_file_name, file_utils.is_4k_video(video))
                     parent_folder_path = os.path.dirname(image)
                     folder_path = os.path.join(parent_folder_path, folder_name)
                     create_dir_if_not_exists(folder_path)
                     file_utils.move_file_by_renaming(image, folder_path)
                     file_utils.move_file_by_renaming(video, folder_path)
+                    # rename image file to number name
+                    number_name = f'{image_prefix.upper()}.jpg'
+                    os.rename(os.path.join(folder_path, image_file_name), os.path.join(folder_path, number_name))
                     video_files.remove(video)
                     found_video = True
                     break
