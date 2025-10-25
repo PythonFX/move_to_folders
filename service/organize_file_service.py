@@ -15,9 +15,12 @@ class OrganizeFileService:
         self.processed_folders = set()
 
     def load_actors(self):
-        self._load_actors_in_path(self.xsk_path)
-        self._load_actors_in_path(self.jav_path)
-        self._update_actor_names()
+        try:
+            self._load_actors_in_path(self.xsk_path)
+            self._load_actors_in_path(self.jav_path)
+            self._update_actor_names()
+        except Exception as e:
+            print(str(e))
         
     def _update_actor_names(self):
         self.actor_names = list(self.actors.keys())
@@ -170,6 +173,7 @@ class OrganizeFileService:
                 print(f'video_prefix = {video_prefix}')
                 if image_prefix == video_prefix:
                     image_file_name = os.path.basename(image)
+                    video_file_name = file_utils.full_filename(video)
                     folder_name = get_folder_name(image_file_name, file_utils.is_4k_video(video))
                     parent_folder_path = os.path.dirname(image)
                     folder_path = os.path.join(parent_folder_path, folder_name)
@@ -177,8 +181,15 @@ class OrganizeFileService:
                     file_utils.move_file_by_renaming(image, folder_path)
                     file_utils.move_file_by_renaming(video, folder_path)
                     # rename image file to number name
-                    number_name = f'{image_prefix.upper()}.jpg'
-                    os.rename(os.path.join(folder_path, image_file_name), os.path.join(folder_path, number_name))
+                    
+                    number_name = image_prefix.upper()
+                    os.rename(os.path.join(folder_path, image_file_name),
+                              os.path.join(folder_path, f'{number_name}.jpg'))
+                    # rename video file to number name
+                    ext = file_utils.extension(video)
+                    os.rename(os.path.join(folder_path, video_file_name),
+                              os.path.join(folder_path, f'{number_name}.{ext}'))
+                    
                     video_files.remove(video)
                     found_video = True
                     break

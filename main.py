@@ -130,6 +130,7 @@ class MainWindow(QMainWindow):
             file_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if
                           os.path.isfile(os.path.join(folder_path, f))]
             self.organize_file_service.sort_and_organize_files(file_paths)
+            print('move finished')
         else:
             print("Invalid folder path")
 
