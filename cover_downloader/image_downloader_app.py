@@ -74,7 +74,7 @@ class ImageDownloaderApp(QMainWindow):
         controls_layout = QHBoxLayout()
         
         # Download folder selection
-        self.folder_label = QLabel("Download folder: ./downloads")
+        self.folder_label = QLabel("Download folder: ~/Downloads/JAV_Covers")
         self.folder_button = QPushButton("Change Folder")
         self.folder_button.clicked.connect(self.select_download_folder)
         
@@ -128,7 +128,7 @@ class ImageDownloaderApp(QMainWindow):
         layout.addWidget(self.log_textedit)
         
         # Set default download folder
-        self.download_folder = "./downloads"
+        self.download_folder = "~/Downloads/JAV_Covers"
         os.makedirs(self.download_folder, exist_ok=True)
         
         # Counters for statistics

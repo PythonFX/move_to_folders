@@ -33,7 +33,7 @@ class DownloadThread(QThread):
         self.url_prefix = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/"
         self.url_suffix = "pl.jpg"
         self.numbers = numbers
-        self.download_folder = "/Users/vincent/Downloads/JAV_Covers"
+        self.download_folder = download_folder.replace("~", "/Users/vincent")
         self.failed_list = [
             "HODV-21066",
             "DV-1649",
@@ -85,14 +85,13 @@ class DownloadThread(QThread):
             filename = f"{number}.jpg"
             save_path = os.path.join(self.download_folder, filename)
             
+            self.progress_signal.emit(i + 1, total, f"Downloading: {number}")
+            
             if os.path.exists(save_path):
                 self.finished_signal.emit(True, number, f"Skip: {filename}")
                 continue
             
-            self.progress_signal.emit(i + 1, total, f"Downloading: {number}")
-            
             try:
-                
                 # Extract filename from URL or generate one
                 urls = self._get_urls_from_number(number)
                 for url in urls:
@@ -103,7 +102,6 @@ class DownloadThread(QThread):
                         break
                     else:
                         self.finished_signal.emit(False, number, f"Failed: {number}")
-            
             except Exception as e:
                 self.finished_signal.emit(False, number, f"Error: {str(e)}")
     
