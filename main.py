@@ -110,17 +110,17 @@ class MainWindow(QMainWindow):
             self.on_drop_for_remove_folders(event)
 
     def on_drop_for_rename_video_files(self, event):
-        file_paths = event.mimeData().urls()
+        file_paths = event.mimeData().numbers()
         file_paths = [path.toLocalFile() for path in file_paths]
         self.rename_service.rename_files(file_paths)
 
     def on_drop_for_put_into_folders(self, event):
-        file_paths = event.mimeData().urls()
+        file_paths = event.mimeData().numbers()
         file_paths = [path.toLocalFile() for path in file_paths]
         self.organize_file_service.sort_and_organize_files(file_paths)
 
     def on_drop_for_remove_folders(self, event):
-        file_path = event.mimeData().urls()[0].toLocalFile()
+        file_path = event.mimeData().numbers()[0].toLocalFile()
         file_path = file_utils.clean_path(file_path)
         self.move_files_to_parent_and_remove_subfolders(file_path)
 

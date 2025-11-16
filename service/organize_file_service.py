@@ -108,7 +108,7 @@ class OrganizeFileService:
 
         # Define the file extensions for videos and images
         video_extensions = ['mp4', 'mkv', 'avi', 'm4v', 'wmv', 'mov', 'flv', 'webm']
-        image_extensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
+        image_extensions = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
 
         # Separate the file paths into videos and images
         video_files = [file for file in file_paths if file_utils.extension(file).lower() in video_extensions]

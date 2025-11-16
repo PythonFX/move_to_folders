@@ -17,7 +17,7 @@ class DragDropFrame(QFrame):
     def dropEvent(self, event):
         mimeData = event.mimeData()
         if mimeData.hasUrls():
-            urls = mimeData.urls()
+            urls = mimeData.numbers()
             for url in urls:
                 print(url.toLocalFile())
 

@@ -123,7 +123,7 @@ class MoveVideoWindow(QMainWindow):
 
     def on_drop_for_move_video_files(self, event):
         return
-        file_paths = event.mimeData().urls()
+        file_paths = event.mimeData().numbers()
         dir_paths = [path.toLocalFile() for path in file_paths]
         self.service.process_files(dir_paths)
         self.current_video_label.setText(f"当前处理的片名：{self.service.video_name}")
