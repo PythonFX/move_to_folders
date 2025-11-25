@@ -3,6 +3,7 @@ import shutil
 
 import file_utils
 from model.actor_folder import ActorFolder
+from string_utils import get_video_number_with_tags
 
 
 class OrganizeFileService:
@@ -187,8 +188,9 @@ class OrganizeFileService:
                               os.path.join(folder_path, f'{number_name}.jpg'))
                     # rename video file to number name
                     ext = file_utils.extension(video)
+                    update_file_name = get_video_number_with_tags(video_file_name)
                     os.rename(os.path.join(folder_path, video_file_name),
-                              os.path.join(folder_path, f'{number_name}.{ext}'))
+                              os.path.join(folder_path, f'{update_file_name}.{ext}'))
                     
                     video_files.remove(video)
                     found_video = True

@@ -14,7 +14,11 @@ def get_video_number_with_tags(file_name_or_path):
     video_number = _extract_video_number_from_string(file_name)
     if '4K' in file_name:
         video_number += '-4K'
-    if '-C' in file_name:
+    if '-UC' in file_name:
+        video_number += '-UC'
+    elif '-U' in file_name:
+        video_number += '-U'
+    elif '-C' in file_name:
         video_number += '-C'
     return video_number
 
@@ -36,7 +40,7 @@ def _extract_video_number_from_string(text):
     if len(result) == 1:
         return result[0]
     if len(result) == 0:
-        pattern = pattern = r'(?<![A-Z])([A-Z]{2,5}-\d{4})(?![0-9])'
+        pattern = r'(?<![A-Z])([A-Z]{2,5}-\d{4})(?![0-9])'
         result = re.findall(pattern, text)
         if len(result) == 1:
             return result[0]
