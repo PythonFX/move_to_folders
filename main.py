@@ -174,6 +174,10 @@ class MainWindow(QMainWindow):
         
     def on_cancel_move_video_btn_click(self):
         print('cancel move video')
+        folder_path = self.folder_path_entry.text()
+        video_name = self.current_process_video_label.text()
+        video_folder_path = os.path.join(folder_path, video_name)
+        self.organize_file_service.ignore_move_video_folder(video_folder_path)
 
     def move_files_to_parent_and_remove_subfolders(self, path):
         # Check if the path is valid

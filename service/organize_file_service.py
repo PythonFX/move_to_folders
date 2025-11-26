@@ -102,6 +102,9 @@ class OrganizeFileService:
             return
         shutil.move(source_video_folder_path, target_parent_path)
         actor_entry.setText('==Move Finish==')
+        
+    def ignore_move_video_folder(self, folder_name: str):
+        self.processed_folders.add(folder_name)
 
     def sort_and_organize_files(self, file_paths):
         # ignore folder path

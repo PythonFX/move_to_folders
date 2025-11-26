@@ -39,6 +39,8 @@ class MoveVideoWindow(QMainWindow):
         self.current_video_label.setText("当前处理的片名：")
         self.current_video_label.setWordWrap(True)
         self.current_video_label.setFixedWidth(400)
+        self.current_video_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
 
         # Add buttons
         self.move_video_button = QPushButton("移动视频文件", self)
