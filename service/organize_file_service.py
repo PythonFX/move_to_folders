@@ -1,9 +1,11 @@
 import os
 import shutil
+import time
 
 import file_utils
 from model.actor_folder import ActorFolder
 from string_utils import get_video_number_with_tags
+from PyQt5.QtCore import QThread, pyqtSignal
 
 
 class OrganizeFileService:
@@ -79,7 +81,7 @@ class OrganizeFileService:
             actor_name = '==合集=='
         if '==合集==' != actor_name and '==' in actor_name:
             print('actor name invalid')
-            return
+            return None, 'actor name invalid'
         if actor_name not in self.actor_names:
             print(f'{actor_name} is not valid actor name, to create one')
             # add this actor to self.xsk_path
@@ -90,7 +92,7 @@ class OrganizeFileService:
             self.actors[actor_name] = new_actor
             self._update_actor_names()
             print(f'{new_folder} created')
-            
+
         actor = self.actors[actor_name]
         source_video_folder_path = os.path.join(source_parent_folder, folder_name)
         target_parent_path = actor.folder_path
@@ -98,10 +100,9 @@ class OrganizeFileService:
         target_path = os.path.join(target_parent_path, folder_name)
         if os.path.exists(target_path):
             print('[ERROR] target video folder exists! No Move!')
-            actor_entry.setText('==[ERROR] Exist==')
-            return
-        shutil.move(source_video_folder_path, target_parent_path)
-        actor_entry.setText('==Move Finish==')
+            return None, 'target exists'
+
+        return (source_video_folder_path, target_parent_path), None
         
     def ignore_move_video_folder(self, folder_name: str):
         self.processed_folders.add(folder_name)
@@ -208,3 +209,73 @@ class OrganizeFileService:
 
             if not found_video:
                 print(f'No video found for {os.path.basename(image)}')
+
+
+class MoveVideoWorker(QThread):
+    progress = pyqtSignal(str)  # emit status message
+    finished = pyqtSignal(bool, str)  # emit (success, message)
+
+    def __init__(self, source_path, target_path, parent=None):
+        super().__init__(parent)
+        self.source_path = source_path
+        self.target_path = target_path
+
+    def _get_folder_size(self, path):
+        total = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if os.path.exists(fp):
+                    total += os.path.getsize(fp)
+        return total
+
+    def _move_with_progress(self, src, dst):
+        total_size = self._get_folder_size(src)
+        moved_size = 0
+        start_time = time.time()
+
+        # dst is the parent target path, src_folder_name will be appended
+        src_folder_name = os.path.basename(src)
+        target_folder_path = os.path.join(dst, src_folder_name)
+        if not os.path.exists(target_folder_path):
+            os.makedirs(target_folder_path)
+
+        # Move folder by moving each file with chunked copy, preserving folder structure
+        for dirpath, dirnames, filenames in os.walk(src):
+            rel_path = os.path.relpath(dirpath, src)
+            dest_dir = os.path.join(target_folder_path, rel_path) if rel_path != '.' else target_folder_path
+            if not os.path.exists(dest_dir):
+                os.makedirs(dest_dir)
+            for filename in filenames:
+                src_file = os.path.join(dirpath, filename)
+                dst_file = os.path.join(dest_dir, filename)
+                # Remove existing file at destination
+                if os.path.exists(dst_file):
+                    os.remove(dst_file)
+                # Use chunked copy for progress tracking
+                with open(src_file, 'rb') as fsrc:
+                    with open(dst_file, 'wb') as fdst:
+                        while True:
+                            chunk = fsrc.read(100 * 1024 * 1024)  # 100MB chunks
+                            if not chunk:
+                                break
+                            fdst.write(chunk)
+                            moved_size += len(chunk)
+                            elapsed = time.time() - start_time
+                            if elapsed > 0:
+                                speed = moved_size / elapsed
+                                percent = (moved_size / total_size * 100) if total_size > 0 else 0
+                                self.progress.emit(f"速度: {speed/1024/1024:.1f} MB/s | {percent:.1f}%")
+                            time.sleep(0.05)  # Allow Qt event loop to process signals
+                os.remove(src_file)  # Remove source file after copy
+        # Remove empty source folder
+        if os.path.exists(src) and not os.listdir(src):
+            os.rmdir(src)
+
+    def run(self):
+        try:
+            self.progress.emit("正在计算文件大小...")
+            self._move_with_progress(self.source_path, self.target_path)
+            self.finished.emit(True, "移动完成")
+        except Exception as e:
+            self.finished.emit(False, f"移动失败: {str(e)}")

@@ -72,6 +72,10 @@ class MainWindow(QMainWindow):
         self.cancel_move_button = QPushButton("跳过该视频", self)
         self.cancel_move_button.clicked.connect(self.on_cancel_move_video_btn_click)
 
+        # Status label at bottom
+        self.status_label = QLabel("", self)
+        self.status_label.setStyleSheet("QLabel { color: gray; }")
+
         # Set layout
         layout = QVBoxLayout()
         layout.addWidget(self.rename_video_frame)
@@ -86,6 +90,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.current_video_actor_entry)
         layout.addWidget(self.confirm_move_button)
         layout.addWidget(self.cancel_move_button)
+        layout.addWidget(self.status_label)
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
@@ -167,10 +172,37 @@ class MainWindow(QMainWindow):
         if os.path.isdir(folder_path):
             actor_name = self.current_video_actor_entry.text()
             video_name = self.current_process_video_label.text()
-            self.organize_file_service.confirm_move_video_folder(
+            result, error = self.organize_file_service.confirm_move_video_folder(
                 video_name, actor_name, folder_path, self.current_video_actor_entry)
+            if error:
+                self.status_label.setText(f"错误: {error}")
+                return
+            if result is None:
+                return
+
+            source_path, target_path = result
+            self._start_move_worker(source_path, target_path)
         else:
             print("Invalid folder path")
+
+    def _start_move_worker(self, source_path, target_path):
+        from service.organize_file_service import MoveVideoWorker
+
+        self.confirm_move_button.setEnabled(False)
+        self.cancel_move_button.setEnabled(False)
+
+        self.worker = MoveVideoWorker(source_path, target_path)
+        self.worker.progress.connect(lambda msg: self.status_label.setText(msg))
+        self.worker.finished.connect(lambda success, msg: self._on_move_finished(success, msg))
+
+        self.worker.start()
+
+    def _on_move_finished(self, success, msg):
+        self.status_label.setText(msg)
+        self.confirm_move_button.setEnabled(True)
+        self.cancel_move_button.setEnabled(True)
+        if success:
+            self.current_video_actor_entry.setText('==Move Finish==')
         
     def on_cancel_move_video_btn_click(self):
         print('cancel move video')
