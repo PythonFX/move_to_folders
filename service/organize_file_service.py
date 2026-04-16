@@ -162,6 +162,13 @@ class OrganizeFileService:
         # Iterate over each image file
         for image in image_files:
             image_name = file_utils.full_filename(image)
+            is_valid_image = True
+            for video_extension in video_extensions:
+                if video_extension in image_name:
+                    is_valid_image = False
+                    break
+            if not is_valid_image:
+                continue
             first_space_idx = image_name.find(' ')
             if first_space_idx == -1:
                 prefix_len = 8  # like ABP-986

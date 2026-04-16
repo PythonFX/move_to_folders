@@ -38,9 +38,9 @@ def clean_video_filename(full_file_name: str, folder_path: str):
     if '@' in file_name:
         parts = file_name.split('@')
         if len(parts) == 2:
-            if '.com' in parts[0] or '.net' in parts[0]:
+            if '.com' in parts[0] or '.net' in parts[0] or '.me' in parts[0]:
                 file_name = parts[1]
-            elif '.com' in parts[1] or '.net' in parts[1]:
+            elif '.com' in parts[1] or '.net' in parts[1] or '.me' in parts[1]:
                 file_name = parts[0]
             full_file_name = f'{file_name}.{ext}'
     # rename to new name

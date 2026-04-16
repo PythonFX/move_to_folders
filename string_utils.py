@@ -12,8 +12,8 @@ def get_video_number(file_name_or_path):
 def get_video_number_with_tags(file_name_or_path):
     file_name = file_utils.filename(file_name_or_path).upper()
     video_number = _extract_video_number_from_string(file_name)
-    if '4K' in file_name:
-        video_number += '-4K'
+    # if '4K' in file_name:
+    #     video_number += '-4K'
     if '-UC' in file_name:
         video_number += '-UC'
     elif '-U' in file_name:
