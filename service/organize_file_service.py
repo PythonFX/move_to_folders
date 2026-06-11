@@ -14,16 +14,27 @@ class OrganizeFileService:
         self.actors = {}  # key: actor_name, value: ActorFolder
         self.xsk_path = '/Volumes/XSK'
         self.jav_path = '/Volumes/JAV'
+        self.jav_path_2 = '/Volumes/JAV_2'
         self.load_actors()
         self.processed_folders = set()
 
     def load_actors(self):
-        try:
-            self._load_actors_in_path(self.xsk_path)
-            self._load_actors_in_path(self.jav_path)
-            self._update_actor_names()
-        except Exception as e:
-            print(str(e))
+        if os.path.exists(self.xsk_path):
+            try:
+                self._load_actors_in_path(self.xsk_path)
+            except Exception as e:
+                print(str(e))
+        if os.path.exists(self.jav_path):
+            try:
+                self._load_actors_in_path(self.jav_path)
+            except Exception as e:
+                print(str(e))
+        if os.path.exists(self.jav_path_2):
+            try:
+                self._load_actors_in_path(self.jav_path_2)
+            except Exception as e:
+                print(str(e))
+        self._update_actor_names()
         
     def _update_actor_names(self):
         self.actor_names = list(self.actors.keys())
