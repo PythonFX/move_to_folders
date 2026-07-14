@@ -1,5 +1,6 @@
 .omc/
 CLAUDE.md
+.DS_Store
 
 .idea
 .venv

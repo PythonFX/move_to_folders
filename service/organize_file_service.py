@@ -283,10 +283,31 @@ class MoveVideoWorker(QThread):
         if os.path.exists(src) and not os.listdir(src):
             os.rmdir(src)
 
+    def _is_same_filesystem(self, src, dst):
+        # Compare device ids. dst is the parent target folder (already exists);
+        # if it somehow doesn't, fall back to its nearest existing ancestor.
+        probe = dst
+        while probe and not os.path.exists(probe):
+            parent = os.path.dirname(probe)
+            if parent == probe:
+                break
+            probe = parent
+        try:
+            return os.stat(src).st_dev == os.stat(probe).st_dev
+        except OSError:
+            return False
+
     def run(self):
         try:
-            self.progress.emit("正在计算文件大小...")
-            self._move_with_progress(self.source_path, self.target_path)
+            src_folder_name = os.path.basename(self.source_path)
+            target_folder_path = os.path.join(self.target_path, src_folder_name)
+            if self._is_same_filesystem(self.source_path, self.target_path):
+                # Same volume -> instant atomic rename, no byte copying.
+                self.progress.emit("同盘，正在重命名...")
+                os.rename(self.source_path, target_folder_path)
+            else:
+                self.progress.emit("正在计算文件大小...")
+                self._move_with_progress(self.source_path, self.target_path)
             self.finished.emit(True, "移动完成")
         except Exception as e:
             self.finished.emit(False, f"移动失败: {str(e)}")
