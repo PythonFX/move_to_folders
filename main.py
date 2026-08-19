@@ -1,7 +1,7 @@
 import os
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFrame, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 from drag_drop_frame import DragDropFrame
 import file_utils
 from service.organize_file_service import OrganizeFileService
@@ -16,6 +16,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.default_path = '/Users/vincent/Downloads/bus_new_download'
         self.setWindowTitle("JAV 封面视频整理小工具")
+
+        # Persisted settings (remembers last used folder path across sessions)
+        self.settings = QSettings("JavManager", "MoveToFolders")
 
         # Services
         self.organize_file_service = OrganizeFileService()
@@ -45,7 +48,10 @@ class MainWindow(QMainWindow):
 
         # Folder Path Input
         self.folder_path_entry = QLineEdit(self)
-        self.folder_path_entry.setText(self.default_path)
+        # Restore last used path; fall back to default on first run
+        self.folder_path_entry.setText(self.settings.value("last_folder_path", self.default_path))
+        # Persist whenever the user finishes editing the field
+        self.folder_path_entry.editingFinished.connect(self._save_folder_path)
 
         # Button to process files in folder
         self.process_button = QPushButton("整理到各个文件夹", self)
@@ -95,6 +101,9 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
+
+    def _save_folder_path(self):
+        self.settings.setValue("last_folder_path", self.folder_path_entry.text())
 
     def dragEnterEvent(self, event):
         print('dragEnterEvent')
@@ -157,6 +166,7 @@ class MainWindow(QMainWindow):
     def on_start_move_videos_btn_click(self):
         print('on_start_move_videos_btn_click')
         folder_path = self.folder_path_entry.text()
+        self._save_folder_path()
         if os.path.isdir(folder_path):
             folder_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if
                             os.path.isdir(os.path.join(folder_path, f))]
