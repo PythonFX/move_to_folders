@@ -14,9 +14,9 @@ def get_video_number_with_tags(file_name_or_path):
     video_number = _extract_video_number_from_string(file_name)
     # if '4K' in file_name:
     #     video_number += '-4K'
-    if '-UC' in file_name:
+    if '-UC' in file_name or '-U-C' in file_name or '-C-U' in file_name:
         video_number += '-UC'
-    elif '-U' in file_name:
+    elif '-U' in file_name or 'UNCENSORED' in file_name or 'RESTORED' in file_name:
         video_number += '-U'
     elif '-C' in file_name:
         video_number += '-C'
