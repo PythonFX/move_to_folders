@@ -7,3 +7,6 @@ CLAUDE.md
 build/
 dist/
 __pycache__
+.chrome-profile/
+jav_metadata/state.json
+jav_metadata/logs/
