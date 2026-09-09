@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFrame, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 from PyQt5.QtCore import Qt, QSettings
@@ -61,6 +62,10 @@ class MainWindow(QMainWindow):
         self.remove_folder_button = QPushButton("视频和封面图平铺开", self)
         self.remove_folder_button.clicked.connect(self.on_remove_folder_btn_click)
 
+        # Button to pull large videos (>100MB) out of subfolders into the root folder
+        self.extract_large_videos_button = QPushButton("子文件夹大视频(>100MB)移到根目录", self)
+        self.extract_large_videos_button.clicked.connect(self.on_extract_large_videos_btn_click)
+
         # Button to process files in folder
         self.print_folder_contents_button = QPushButton("输出该文件夹下的全部内容", self)
         self.print_folder_contents_button.clicked.connect(self.on_print_folder_contents)
@@ -90,6 +95,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.folder_path_entry)
         layout.addWidget(self.process_button)
         layout.addWidget(self.remove_folder_button)
+        layout.addWidget(self.extract_large_videos_button)
         layout.addWidget(self.print_folder_contents_button)
         layout.addWidget(self.start_move_video_folders_button)
         layout.addWidget(self.current_process_video_label)
@@ -151,6 +157,33 @@ class MainWindow(QMainWindow):
     def on_remove_folder_btn_click(self):
         folder_path = self.folder_path_entry.text()
         self.move_files_to_parent(folder_path)
+
+    def on_extract_large_videos_btn_click(self):
+        folder_path = self.folder_path_entry.text()
+        self._save_folder_path()
+        if not os.path.isdir(folder_path):
+            self.status_label.setText("无效的文件夹路径")
+            return
+        min_size = 100 * 1024 * 1024  # 100MB
+        moved, skipped = 0, 0
+        for root, _dirs, files in os.walk(folder_path):
+            if os.path.abspath(root) == os.path.abspath(folder_path):
+                continue  # only look inside subfolders
+            for file in files:
+                src = os.path.join(root, file)
+                if not file_utils.is_video_file(file):
+                    continue
+                if os.path.getsize(src) <= min_size:
+                    continue
+                dst = os.path.join(folder_path, file)
+                if os.path.exists(dst):
+                    skipped += 1
+                    print(f"跳过(根目录已存在同名文件): {src}")
+                    continue
+                shutil.move(src, dst)
+                moved += 1
+                print(f"已移动: {src} -> {dst}")
+        self.status_label.setText(f"已移动 {moved} 个大视频到根目录，跳过 {skipped} 个(重名)")
 
     def on_print_folder_contents(self):
         folder_path = self.folder_path_entry.text()

@@ -1,10 +1,10 @@
 # JAV Metadata Automation 配置
-movie_root: ""                # 扫描根目录，也可用 CLI --root 覆盖
+movie_root: "/Volumes/XSK/==new==/==new=="   # 扫描根目录，也可用 CLI --root 覆盖
 retry_count: 3
 timeout: 30000                # 页面加载/evaluate 超时 (ms)
 download_delay: 3             # 每部之间的间隔秒数（低频稳定优先）
 headless: false               # 设计文档要求 headed 模式
 close_tab_after_download: true
-chrome_profile_dir: "./.chrome-profile"   # 独立 Chrome Profile，不用默认 Profile
+chrome_profile_dir: "~/Library/Application Support/Google/Chrome"   # 日常 Chrome Profile
 detail_url_template: "https://www.javbus.com/{number}"
 skip_processed: true          # 依据 state.json 跳过已成功的番号

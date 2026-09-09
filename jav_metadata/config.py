@@ -2,13 +2,13 @@ import os
 import yaml
 
 DEFAULT_CONFIG = {
-    'movie_root': '',
+    'movie_root': '/Volumes/XSK/==new==/==new==',
     'retry_count': 3,
     'timeout': 30000,
     'download_delay': 3,
     'headless': False,
     'close_tab_after_download': True,
-    'chrome_profile_dir': './.chrome-profile',
+    'chrome_profile_dir': '~/Library/Application Support/Google/Chrome',
     'detail_url_template': 'https://www.javbus.com/{number}',
     'skip_processed': True,
 }

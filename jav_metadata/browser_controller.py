@@ -8,6 +8,18 @@ from jav_metadata.task import TaskStatus
 # 文件名非法字符统一替换
 ILLEGAL_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]')
 
+# 过滤掉 Playwright 默认参数里影响"正常 Chrome 体验"的项：
+# 不禁用扩展、不显示自动化提示条、不加 sandbox/mock keychain 等隔离参数
+IGNORE_DEFAULT_ARGS = [
+    '--enable-automation',
+    '--disable-extensions',
+    '--disable-component-extensions-with-background-pages',
+    '--disable-default-apps',
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    '--use-mock-keychain',
+]
+
 
 def sanitize_filename(name):
     """统一替换非法字符，去首尾空格和点"""
@@ -36,13 +48,15 @@ class BrowserController:
 
     def launch(self):
         self._playwright = sync_playwright().start()
-        profile_dir = os.path.abspath(self.config['chrome_profile_dir'])
+        profile_dir = os.path.abspath(os.path.expanduser(self.config['chrome_profile_dir']))
         os.makedirs(profile_dir, exist_ok=True)
         self.context = self._playwright.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
             channel='chrome',
             headless=self.config['headless'],
             accept_downloads=True,
+            ignore_default_args=IGNORE_DEFAULT_ARGS,
+            args=['--disable-blink-features=AutomationControlled'],
         )
         self.context.set_default_timeout(self.config['timeout'])
 

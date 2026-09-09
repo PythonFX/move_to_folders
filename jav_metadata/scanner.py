@@ -29,7 +29,7 @@ def scan_movie_root(movie_root, logger=None):
                 number = string_utils.get_video_number(file_name)
             except (NoVideoNumberMatch, MultipleVideoNumberMatch) as e:
                 task = Task(number='', video_path=video_path,
-                            status=TaskStatus.NO_NUMBER, message=str(e))
+                            status=TaskStatus.NO_NUMBER, message=f'{file_name} | {e}')
                 tasks.append(task)
                 if logger:
                     logger.log(task)

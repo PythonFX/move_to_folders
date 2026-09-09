@@ -4,6 +4,13 @@ from pathlib import Path
 
 
 # full filename is filename + extension
+VIDEO_EXTENSIONS = {'mp4', 'mkv', 'avi', 'm4v', 'wmv', 'mov', 'flv', 'webm'}
+
+
+def is_video_file(path: str):
+    return extension(path).lower() in VIDEO_EXTENSIONS
+
+
 def full_filename(path: str):
     path = path.rstrip(os.sep)
     return os.path.basename(path)
