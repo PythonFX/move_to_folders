@@ -51,6 +51,10 @@ def main():
     parser.add_argument('--test', action='store_true', help='测试模式：只处理前两个任务后停止')
     parser.add_argument('--setup', action='store_true',
                         help='只启动独立 Profile 的 Chrome 并等待，用于安装 Tampermonkey 和导入脚本')
+    parser.add_argument('--search', metavar='KEYWORD',
+                        help='搜索模式：逐页收集搜索结果的番号并输出（不下载封面）')
+    parser.add_argument('--max-pages', type=int, default=None, help='--search 最多翻页数')
+    parser.add_argument('--magnets', metavar='NUMBER', help='提取指定番号的磁力下载列表并输出')
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -58,14 +62,32 @@ def main():
     if args.setup:
         setup_browser()
         return
+
+    logger = ResultLogger()
+    logger.info(f'log file: {logger.log_path}')
+
+    if args.search:
+        from jav_metadata.search import collect_search_numbers
+        numbers = collect_search_numbers(config, args.search, max_pages=args.max_pages, logger=logger)
+        for number in numbers:
+            print(number)
+        logger.info(f'search "{args.search}": total {len(numbers)} movie(s)')
+        return
+
+    if args.magnets:
+        from jav_metadata.search import get_movie_magnets
+        magnets = get_movie_magnets(config, args.magnets, logger=logger)
+        for m in magnets:
+            print(f'{m["date"]}\t{m["size"]}\t{m["name"]}\n\t{m["magnet"]}')
+        logger.info(f'{args.magnets}: total {len(magnets)} magnet(s)')
+        return
+
     if args.root:
         config['movie_root'] = args.root
     if not config['movie_root'] or not os.path.isdir(config['movie_root']):
         print('error: 请通过 --root 或 config.yaml 的 movie_root 指定有效的视频目录')
         sys.exit(1)
 
-    logger = ResultLogger()
-    logger.info(f'log file: {logger.log_path}')
     logger.info(f'scanning: {config["movie_root"]}')
 
     tasks = scan_movie_root(config['movie_root'], logger)

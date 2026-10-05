@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         JavBus Cover Downloader (Python Scheduler Bridge)
 // @namespace    jav-metadata-automation
-// @version      0.1.0
-// @description  JAV Metadata Automation 页面层：向 Python Playwright 调度端暴露 window.isReady / getMovieInfo / downloadCurrentMovie
+// @version      0.2.0
+// @description  JAV Metadata Automation 页面层：向 Python Playwright 调度端暴露 window.isReady / getMovieInfo / downloadCurrentMovie / getSearchResults / getMagnetList
 // @match        https://www.javbus.com/*
 // @grant        none
 // @run-at       document-idle
@@ -113,6 +113,36 @@
         document.body.appendChild(a);
         a.click();
         a.remove();
+    };
+
+    // 搜索结果页：提取当前页全部条目 [{number, url}]
+    window.getSearchResults = function () {
+        return Array.from(document.querySelectorAll('a.movie-box'))
+            .map(a => {
+                const m = (a.href || '').match(/javbus\.com\/([A-Za-z0-9-]+)\/?(\?.*)?$/);
+                return m ? { number: m[1].toUpperCase(), url: a.href } : null;
+            })
+            .filter(Boolean);
+    };
+
+    // 详情页：提取"磁力連結投稿"表格 [{name, magnet, size, date}]
+    window.getMagnetList = function () {
+        const table = document.querySelector('table#magnet-table')
+            || Array.from(document.querySelectorAll('table')).find(t => t.querySelector('a[href^="magnet:"]'));
+        if (!table) return [];
+        const rows = [];
+        for (const tr of table.querySelectorAll('tr')) {
+            const link = tr.querySelector('a[href^="magnet:"]');
+            if (!link) continue;
+            const tds = tr.querySelectorAll('td');
+            rows.push({
+                name: (tds[0] ? tds[0].textContent : link.textContent).replace(/\s+/g, ' ').trim(),
+                magnet: link.href,
+                size: tds[1] ? tds[1].textContent.trim() : '',
+                date: tds[2] ? tds[2].textContent.trim() : '',
+            });
+        }
+        return rows;
     };
 
     // 手动调试用：在 DevTools Console 执行 window.debugPageInfo() 查看页面结构
