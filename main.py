@@ -51,6 +51,24 @@ class CoverDownloadWorker(QThread):
             self.done.emit(f'封面下载出错: {e}')
 
 
+class MagnetFetchWorker(QThread):
+    """后台提取单个番号的磁力下载列表，避免冻结 GUI"""
+    done = pyqtSignal(str, list, str)  # number, magnets, error
+
+    def __init__(self, number):
+        super().__init__()
+        self.number = number
+
+    def run(self):
+        from jav_metadata.config import load_config
+        from jav_metadata.search import get_movie_magnets
+        try:
+            magnets = get_movie_magnets(load_config(), self.number)
+            self.done.emit(self.number, magnets, '')
+        except Exception as e:
+            self.done.emit(self.number, [], str(e))
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -101,6 +119,12 @@ class MainWindow(QMainWindow):
         self.download_covers_button = QPushButton("下载全部视频的封面图", self)
         self.download_covers_button.clicked.connect(self.on_download_covers_btn_click)
 
+        # Movie number input + button to fetch all magnet download info
+        self.magnet_number_entry = QLineEdit(self)
+        self.magnet_number_entry.setPlaceholderText("输入番号,例: IPZZ-937")
+        self.fetch_magnets_button = QPushButton("提取该番号的下载信息", self)
+        self.fetch_magnets_button.clicked.connect(self.on_fetch_magnets_btn_click)
+
         # Button to process files in folder
         self.remove_folder_button = QPushButton("视频和封面图平铺开", self)
         self.remove_folder_button.clicked.connect(self.on_remove_folder_btn_click)
@@ -137,6 +161,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.flatten_folder_frame)
         layout.addWidget(self.folder_path_entry)
         layout.addWidget(self.download_covers_button)
+        layout.addWidget(self.magnet_number_entry)
+        layout.addWidget(self.fetch_magnets_button)
         layout.addWidget(self.process_button)
         layout.addWidget(self.remove_folder_button)
         layout.addWidget(self.extract_large_videos_button)
@@ -200,6 +226,27 @@ class MainWindow(QMainWindow):
         self.cover_worker.progress.connect(lambda msg: self.status_label.setText(f'封面: {msg}'))
         self.cover_worker.done.connect(self._on_cover_download_done)
         self.cover_worker.start()
+
+    def on_fetch_magnets_btn_click(self):
+        number = self.magnet_number_entry.text().strip().upper()
+        if not number:
+            self.status_label.setText("请先输入番号")
+            return
+        self.fetch_magnets_button.setEnabled(False)
+        self.status_label.setText(f"正在提取 {number} 的下载信息...")
+        self.magnet_worker = MagnetFetchWorker(number)
+        self.magnet_worker.done.connect(self._on_magnets_done)
+        self.magnet_worker.start()
+
+    def _on_magnets_done(self, number, magnets, error):
+        self.fetch_magnets_button.setEnabled(True)
+        if error:
+            self.status_label.setText(f"{number} 提取失败: {error}")
+            return
+        self.status_label.setText(f"{number} 共 {len(magnets)} 条下载信息(已打印到控制台)")
+        print(f'===== {number} 磁力下载列表 ({len(magnets)} 条) =====')
+        for m in magnets:
+            print(f'{m["date"]}\t{m["size"]}\t{m["name"]}\n\t{m["magnet"]}')
 
     def _on_cover_download_done(self, msg):
         self.status_label.setText(msg)
