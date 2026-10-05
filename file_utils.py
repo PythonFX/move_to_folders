@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -34,21 +35,32 @@ def clean_path(path: str):
     return path.rstrip(os.sep)
 
 
+# matches site domains like masex.tv, 169bbs.com, [activehlj.com]
+_SITE_DOMAIN_RE = re.compile(r'^\[?[a-zA-Z0-9][a-zA-Z0-9-]*(\.[a-zA-Z]{2,})+\]?$')
+
+
+def _is_site_domain(text: str):
+    return bool(_SITE_DOMAIN_RE.match(text))
+
+
 def clean_video_filename(full_file_name: str, folder_path: str):
     original_file_name = full_file_name
     # try split file by @, typical examples:
     # [activehlj.com]@FSDSS-783_[4K].mkv
     # 169bbs.com@FSDSS-932_[4K].mkv
+    # masex.tv@ipzz-916.mp4
     file_name = filename(full_file_name)
     ext = extension(full_file_name)
-    
+
     if '@' in file_name:
         parts = file_name.split('@')
         if len(parts) == 2:
-            if '.com' in parts[0] or '.net' in parts[0] or '.me' in parts[0]:
-                file_name = parts[1]
-            elif '.com' in parts[1] or '.net' in parts[1] or '.me' in parts[1]:
+            # check parts[1] first: in 'video@site.com' the video code itself
+            # may contain dots (e.g. ABP-986.xyz) and look domain-like
+            if _is_site_domain(parts[1]):
                 file_name = parts[0]
+            elif _is_site_domain(parts[0]):
+                file_name = parts[1]
             full_file_name = f'{file_name}.{ext}'
     # rename to new name
     if full_file_name != original_file_name:
