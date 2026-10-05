@@ -2,7 +2,7 @@ import os
 import shutil
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFrame, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
-from PyQt5.QtCore import Qt, QSettings
+from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal
 from drag_drop_frame import DragDropFrame
 import file_utils
 from service.organize_file_service import OrganizeFileService
@@ -10,6 +10,45 @@ from service.rename_service import RenameService
 from service.actors_service import ActorsService
 
 
+class CoverDownloadWorker(QThread):
+    """后台跑 jav_metadata 封面下载流水线，避免冻结 GUI"""
+    progress = pyqtSignal(str)
+    done = pyqtSignal(str)
+
+    def __init__(self, folder_path):
+        super().__init__()
+        self.folder_path = folder_path
+
+    def run(self):
+        from jav_metadata.config import load_config
+        from jav_metadata.logger import ResultLogger
+        from jav_metadata.scanner import scan_movie_root
+        from jav_metadata.scheduler import run, summarize
+
+        config = load_config()
+        file_logger = ResultLogger()
+        worker = self
+
+        class SignalLogger:
+            """文件日志照写，同时把每个任务结果推到状态栏"""
+            def log(self, task):
+                file_logger.log(task)
+                worker.progress.emit(f'{task.number or "-"} | {task.status}')
+
+            def info(self, message):
+                file_logger.info(message)
+
+        try:
+            tasks = scan_movie_root(self.folder_path, file_logger)
+            tasks = run(tasks, config, SignalLogger())
+            summarize(tasks, file_logger)
+            counts = {}
+            for t in tasks:
+                counts[t.status] = counts.get(t.status, 0) + 1
+            summary = ', '.join(f'{k}:{v}' for k, v in sorted(counts.items()))
+            self.done.emit(f'封面下载完成 [{summary}] 日志: {file_logger.log_path}')
+        except Exception as e:
+            self.done.emit(f'封面下载出错: {e}')
 
 
 class MainWindow(QMainWindow):
@@ -58,6 +97,10 @@ class MainWindow(QMainWindow):
         self.process_button = QPushButton("整理到各个文件夹", self)
         self.process_button.clicked.connect(self.on_move_to_folders_btn_click)
 
+        # Button to download covers for all videos under the configured path
+        self.download_covers_button = QPushButton("下载全部视频的封面图", self)
+        self.download_covers_button.clicked.connect(self.on_download_covers_btn_click)
+
         # Button to process files in folder
         self.remove_folder_button = QPushButton("视频和封面图平铺开", self)
         self.remove_folder_button.clicked.connect(self.on_remove_folder_btn_click)
@@ -93,6 +136,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.move_folder_frame)
         layout.addWidget(self.flatten_folder_frame)
         layout.addWidget(self.folder_path_entry)
+        layout.addWidget(self.download_covers_button)
         layout.addWidget(self.process_button)
         layout.addWidget(self.remove_folder_button)
         layout.addWidget(self.extract_large_videos_button)
@@ -143,6 +187,23 @@ class MainWindow(QMainWindow):
         file_path = event.mimeData().numbers()[0].toLocalFile()
         file_path = file_utils.clean_path(file_path)
         self.move_files_to_parent_and_remove_subfolders(file_path)
+
+    def on_download_covers_btn_click(self):
+        folder_path = self.folder_path_entry.text()
+        self._save_folder_path()
+        if not os.path.isdir(folder_path):
+            self.status_label.setText("无效的文件夹路径")
+            return
+        self.download_covers_button.setEnabled(False)
+        self.status_label.setText("封面下载中（浏览器自动打开 javbus，每部间隔3秒）...")
+        self.cover_worker = CoverDownloadWorker(folder_path)
+        self.cover_worker.progress.connect(lambda msg: self.status_label.setText(f'封面: {msg}'))
+        self.cover_worker.done.connect(self._on_cover_download_done)
+        self.cover_worker.start()
+
+    def _on_cover_download_done(self, msg):
+        self.status_label.setText(msg)
+        self.download_covers_button.setEnabled(True)
 
     def on_move_to_folders_btn_click(self):
         folder_path = self.folder_path_entry.text()

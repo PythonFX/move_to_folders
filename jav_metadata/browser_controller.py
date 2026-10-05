@@ -46,10 +46,15 @@ IGNORE_DEFAULT_ARGS = [
 ]
 
 
-def sanitize_filename(name):
-    """统一替换非法字符，去首尾空格和点"""
+def sanitize_filename(name, max_bytes=240):
+    """统一替换非法字符，去首尾空格和点；按 macOS 255 字节文件名上限截断
+    （预留扩展名位置，240 字节截断，UTF-8 字符边界安全）"""
     name = ILLEGAL_FILENAME_CHARS.sub('_', name)
-    return name.strip(' .')
+    name = name.strip(' .')
+    encoded = name.encode('utf-8')
+    if len(encoded) > max_bytes:
+        name = encoded[:max_bytes].decode('utf-8', errors='ignore').rstrip(' .')
+    return name
 
 
 class BrowserController:
