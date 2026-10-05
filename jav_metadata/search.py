@@ -58,3 +58,39 @@ def get_movie_magnets(config, number, logger=None):
         if logger:
             logger.info(f'{number}: {len(magnets)} magnet(s)')
         return magnets
+
+
+def get_magnets_for_numbers(config, numbers, logger=None, progress=None):
+    """
+    批量提取磁力列表：共用一个浏览器实例，逐片开标签页，
+    片与片之间间隔 download_delay 秒（模拟真人，防封）。
+    progress(done, total, number) 每完成一片回调。
+    返回 {number: [magnet, ...]}
+    """
+    results = {}
+    delay = config.get('download_delay', 3)
+    with BrowserController(config) as browser:
+        for index, number in enumerate(numbers):
+            page = browser.context.new_page()
+            try:
+                url = DETAIL_URL_TEMPLATE.format(number=number)
+                page.goto(url, wait_until='domcontentloaded')
+                page.wait_for_timeout(2000)
+                results[number] = page.evaluate(
+                    "typeof window.getMagnetList === 'function' ? window.getMagnetList() : []")
+                if logger:
+                    logger.info(f'{number}: {len(results[number])} magnet(s)')
+            except Exception as e:
+                results[number] = []
+                if logger:
+                    logger.info(f'{number}: ERROR {e}')
+            finally:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+            if progress:
+                progress(index + 1, len(numbers), number)
+            if index < len(numbers) - 1:
+                time.sleep(delay)
+    return results

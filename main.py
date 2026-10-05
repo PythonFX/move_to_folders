@@ -1,7 +1,8 @@
 import os
+import re
 import shutil
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFrame, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFrame, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QCheckBox
 from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal
 from drag_drop_frame import DragDropFrame
 import file_utils
@@ -51,22 +52,57 @@ class CoverDownloadWorker(QThread):
             self.done.emit(f'封面下载出错: {e}')
 
 
-class MagnetFetchWorker(QThread):
-    """后台提取单个番号的磁力下载列表，避免冻结 GUI"""
-    done = pyqtSignal(str, list, str)  # number, magnets, error
+class CollectLinksWorker(QThread):
+    """后台收集下载链接:输入可以是具体番号(如 IPZZ-937)或关键词(如 ipzz,
+    关键词走搜索页逐页收集全部番号)。按 filter_rules.json 规则筛选后
+    追加写入路径下的当日 md 文件。进度经 progress 信号上状态栏。"""
+    progress = pyqtSignal(str)
+    done = pyqtSignal(str, str)  # 输出文件路径或空串, 摘要/错误信息
 
-    def __init__(self, number):
+    NUMBER_PATTERN = re.compile(r'^[A-Za-z]{2,6}-\d{2,6}$')
+
+    def __init__(self, input_text, folder_path, search_all_pages=False):
         super().__init__()
-        self.number = number
+        self.input_text = input_text.strip()
+        self.folder_path = folder_path
+        self.search_all_pages = search_all_pages
 
     def run(self):
         from jav_metadata.config import load_config
-        from jav_metadata.search import get_movie_magnets
+        from jav_metadata.logger import ResultLogger
+        from jav_metadata.search import collect_search_numbers, get_magnets_for_numbers
+        from jav_metadata.magnet_filter import load_rules, select_magnets
+        from jav_metadata.md_output import append_batch, dated_md_path
+
         try:
-            magnets = get_movie_magnets(load_config(), self.number)
-            self.done.emit(self.number, magnets, '')
+            config = load_config()
+            logger = ResultLogger()
+            rules = load_rules()
+
+            if self.NUMBER_PATTERN.match(self.input_text):
+                numbers = [self.input_text.upper()]
+            else:
+                scope = '全部页面' if self.search_all_pages else '第1页'
+                self.progress.emit(f'关键词模式({scope}): 正在搜索 "{self.input_text}" ...')
+                numbers = collect_search_numbers(
+                    config, self.input_text, logger=logger,
+                    max_pages=None if self.search_all_pages else 1)
+                self.progress.emit(f'搜索完成, 共 {len(numbers)} 部, 开始逐部提取下载列表...')
+
+            def on_progress(done, total, number):
+                self.progress.emit(f'提取中 {done}/{total}: {number}')
+
+            magnets_map = get_magnets_for_numbers(config, numbers, logger=logger,
+                                                  progress=on_progress)
+            entries = [{'number': n, 'sections': select_magnets(magnets_map.get(n, []), n, rules)}
+                       for n in numbers]
+
+            md_path = append_batch(dated_md_path(self.folder_path), self.input_text,
+                                   entries, rules)
+            matched = sum(1 for e in entries if any(e['sections'].values()))
+            self.done.emit(md_path, f'完成: {len(entries)} 部, {matched} 部有匹配链接')
         except Exception as e:
-            self.done.emit(self.number, [], str(e))
+            self.done.emit('', f'收集出错: {e}')
 
 
 class MainWindow(QMainWindow):
@@ -119,10 +155,11 @@ class MainWindow(QMainWindow):
         self.download_covers_button = QPushButton("下载全部视频的封面图", self)
         self.download_covers_button.clicked.connect(self.on_download_covers_btn_click)
 
-        # Movie number input + button to fetch all magnet download info
+        # Movie number / keyword input + button to collect filtered download links
         self.magnet_number_entry = QLineEdit(self)
-        self.magnet_number_entry.setPlaceholderText("输入番号,例: IPZZ-937")
-        self.fetch_magnets_button = QPushButton("提取该番号的下载信息", self)
+        self.magnet_number_entry.setPlaceholderText("输入番号(如 IPZZ-937)或关键词(如 ipzz 搜全部)")
+        self.search_all_pages_checkbox = QCheckBox("关键词搜索全部页面(默认仅第1页)", self)
+        self.fetch_magnets_button = QPushButton("收集下载链接到当日md文件", self)
         self.fetch_magnets_button.clicked.connect(self.on_fetch_magnets_btn_click)
 
         # Button to process files in folder
@@ -162,6 +199,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.folder_path_entry)
         layout.addWidget(self.download_covers_button)
         layout.addWidget(self.magnet_number_entry)
+        layout.addWidget(self.search_all_pages_checkbox)
         layout.addWidget(self.fetch_magnets_button)
         layout.addWidget(self.process_button)
         layout.addWidget(self.remove_folder_button)
@@ -228,25 +266,29 @@ class MainWindow(QMainWindow):
         self.cover_worker.start()
 
     def on_fetch_magnets_btn_click(self):
-        number = self.magnet_number_entry.text().strip().upper()
-        if not number:
-            self.status_label.setText("请先输入番号")
+        input_text = self.magnet_number_entry.text().strip()
+        if not input_text:
+            self.status_label.setText("请先输入番号或关键词")
+            return
+        folder_path = self.folder_path_entry.text()
+        self._save_folder_path()
+        if not os.path.isdir(folder_path):
+            self.status_label.setText("无效的文件夹路径")
             return
         self.fetch_magnets_button.setEnabled(False)
-        self.status_label.setText(f"正在提取 {number} 的下载信息...")
-        self.magnet_worker = MagnetFetchWorker(number)
-        self.magnet_worker.done.connect(self._on_magnets_done)
-        self.magnet_worker.start()
+        self.status_label.setText(f"收集下载链接中: {input_text} ...")
+        self.collect_worker = CollectLinksWorker(input_text, folder_path,
+                                                 search_all_pages=self.search_all_pages_checkbox.isChecked())
+        self.collect_worker.progress.connect(lambda msg: self.status_label.setText(msg))
+        self.collect_worker.done.connect(self._on_collect_links_done)
+        self.collect_worker.start()
 
-    def _on_magnets_done(self, number, magnets, error):
+    def _on_collect_links_done(self, md_path, message):
         self.fetch_magnets_button.setEnabled(True)
-        if error:
-            self.status_label.setText(f"{number} 提取失败: {error}")
-            return
-        self.status_label.setText(f"{number} 共 {len(magnets)} 条下载信息(已打印到控制台)")
-        print(f'===== {number} 磁力下载列表 ({len(magnets)} 条) =====')
-        for m in magnets:
-            print(f'{m["date"]}\t{m["size"]}\t{m["name"]}\n\t{m["magnet"]}')
+        if md_path:
+            self.status_label.setText(f"{message} → {md_path}")
+        else:
+            self.status_label.setText(message)
 
     def _on_cover_download_done(self, msg):
         self.status_label.setText(msg)

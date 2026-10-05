@@ -1,0 +1,25 @@
+{
+  "section1": {
+    "title": "区间1 · 最优选 (番号-U 精确后缀, 大写番号优先)",
+    "steps": [
+      {"tail": "-U", "id_case": "upper"},
+      {"tail": "-U", "id_case": "any"}
+    ]
+  },
+  "section2": {
+    "title": "区间2 · 次优选 (番号-C 小写 > 大写 > -UC; 仅区间1空缺时评估)",
+    "fallback_of": "section1",
+    "steps": [
+      {"tail": "-C", "id_case": "lower"},
+      {"tail": "-C", "id_case": "upper"},
+      {"tail": "-UC", "id_case": "any"}
+    ]
+  },
+  "section3": {
+    "title": "区间3 · 4K ([4K]+R90s 关键词 > 番号-4K)",
+    "steps": [
+      {"contains_all": ["[4K]", "R90s"]},
+      {"tail": "-4k", "id_case": "any", "tail_case_sensitive": true}
+    ]
+  }
+}
