@@ -8,7 +8,8 @@ DEFAULT_CONFIG = {
     'download_delay': 3,
     'headless': False,
     'close_tab_after_download': True,
-    'chrome_profile_dir': '~/Library/Application Support/Google/Chrome',
+    'chrome_profile_dir': os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.chrome-profile'),
     'detail_url_template': 'https://www.javbus.com/{number}',
     'skip_processed': True,
 }

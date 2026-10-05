@@ -4,8 +4,7 @@
 // @version      0.1.0
 // @description  JAV Metadata Automation 页面层：向 Python Playwright 调度端暴露 window.isReady / getMovieInfo / downloadCurrentMovie
 // @match        https://www.javbus.com/*
-// @grant        GM_download
-// @connect      *
+// @grant        none
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -106,12 +105,14 @@
         const title = extractTitle();
         const coverUrl = extractCoverUrl();
         if (!coverUrl) throw new Error('no cover url found');
-        GM_download({
-            url: coverUrl,
-            // Python 侧会用 download.save_as 落盘为最终文件名，这里的 name 只是兜底
-            name: sanitizeFilename(title || 'cover') + '.jpg',
-            onerror: (e) => console.error('[jav-metadata] GM_download error:', e),
-        });
+        // @grant none（页面主世界运行），用 <a download> 触发浏览器原生下载，
+        // Python 侧 page.expect_download() 捕获后 save_as 落盘为最终文件名
+        const a = document.createElement('a');
+        a.href = coverUrl;
+        a.download = sanitizeFilename(title || 'cover') + '.jpg';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
     };
 
     // 手动调试用：在 DevTools Console 执行 window.debugPageInfo() 查看页面结构

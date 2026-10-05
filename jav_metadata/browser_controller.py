@@ -1,12 +1,37 @@
 import os
 import re
 
+import requests
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from jav_metadata.task import TaskStatus
 
 # 文件名非法字符统一替换
 ILLEGAL_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]')
+
+USER_AGENT = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36')
+
+
+def download_cover(url, save_path, referer=None):
+    """直接 HTTP 下载封面（requests 自动使用系统代理）。占位小图视为失败。"""
+    try:
+        headers = {'User-Agent': USER_AGENT}
+        if referer:
+            headers['Referer'] = referer
+        resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        if 'image' not in resp.headers.get('Content-Type', ''):
+            return False
+        if len(resp.content) < 50 * 1024:  # 占位图
+            return False
+        with open(save_path, 'wb') as f:
+            f.write(resp.content)
+        return True
+    except Exception as e:
+        print(f'cover download error: {e}')
+        return False
+
 
 # 过滤掉 Playwright 默认参数里影响"正常 Chrome 体验"的项：
 # 不禁用扩展、不显示自动化提示条、不加 sandbox/mock keychain 等隔离参数
@@ -50,13 +75,17 @@ class BrowserController:
         self._playwright = sync_playwright().start()
         profile_dir = os.path.abspath(os.path.expanduser(self.config['chrome_profile_dir']))
         os.makedirs(profile_dir, exist_ok=True)
+        # 品牌版 Google Chrome 会忽略 --load-extension，Tampermonkey 需提前在
+        # chrome_profile_dir 这个专用 Profile 里从应用商店安装（一次性手动操作），
+        # 并开启「允许运行用户脚本」。调度端只负责启动带该 Profile 的 Chrome。
+        # 注意：不要加 --disable-blink-features=AutomationControlled，
+        # Chrome 154 标记其为不受支持的标记且实测会导致浏览器进程段错误崩溃。
         self.context = self._playwright.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
             channel='chrome',
             headless=self.config['headless'],
             accept_downloads=True,
             ignore_default_args=IGNORE_DEFAULT_ARGS,
-            args=['--disable-blink-features=AutomationControlled'],
         )
         self.context.set_default_timeout(self.config['timeout'])
 
@@ -90,7 +119,13 @@ class BrowserController:
     def _process_on_page(self, page, task, url):
         page.goto(url, wait_until='domcontentloaded')
 
+        # 浏览器刚启动时油猴可能还没完成脚本注册，第一个页面会漏注入；
+        # 等一会儿刷新重试一次再判定 USERSCRIPT_MISSING
         ready = page.evaluate("typeof window.isReady === 'function' && window.isReady()")
+        if not ready:
+            page.wait_for_timeout(2000)
+            page.reload(wait_until='domcontentloaded')
+            ready = page.evaluate("typeof window.isReady === 'function' && window.isReady()")
         if not ready:
             task.status = TaskStatus.USERSCRIPT_MISSING
             task.message = 'window.isReady() not available'
@@ -112,11 +147,13 @@ class BrowserController:
             task.message = f'cover already exists: {save_path}'
             return
 
-        # 事件驱动等待下载完成，不 sleep
-        with page.expect_download() as download_info:
-            page.evaluate("window.downloadCurrentMovie()")
-        download = download_info.value
-        download.save_as(save_path)
+        # 不让浏览器下载：Chrome 154 在 Playwright 经自动化通道拉取下载文件时
+        # 浏览器进程段错误崩溃（见 ~/Library/Logs/DiagnosticReports）。
+        # 拿到 coverUrl 后由 Python 直接 HTTP 下载，彻底绕开该路径。
+        if not download_cover(info['coverUrl'], save_path, referer=url):
+            task.status = TaskStatus.FAILED
+            task.message = f'cover download failed: {info["coverUrl"]}'
+            return
 
         task.status = TaskStatus.SUCCESS
         task.message = save_path

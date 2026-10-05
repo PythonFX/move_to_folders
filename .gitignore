@@ -8,5 +8,6 @@ build/
 dist/
 __pycache__
 .chrome-profile/
+extensions/
 jav_metadata/state.json
 jav_metadata/logs/
