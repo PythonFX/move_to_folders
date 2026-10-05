@@ -46,6 +46,31 @@ IGNORE_DEFAULT_ARGS = [
 ]
 
 
+# 页面层脚本：与油猴共用同一份源码，Python 经 add_init_script 直接注入主世界，
+# 不再依赖 Tampermonkey（无头模式下油猴后台存储损坏，装/改脚本都不可靠）
+USERSCRIPT_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    'userscript', 'javbus_cover_downloader.user.js')
+
+
+def _load_inject_source():
+    """读取 userscript 并剥掉 ==UserScript== 元数据块"""
+    with open(USERSCRIPT_PATH, 'r', encoding='utf-8') as f:
+        src = f.read()
+    return re.sub(r'// ==UserScript==.*?// ==/UserScript==', '', src, flags=re.S)
+
+
+def build_init_script():
+    """包成可重复执行的定义函数：document-start 先定义一次，
+    DOMContentLoaded 再定义一次，确保覆盖油猴 document-idle 注入的旧版本"""
+    body = _load_inject_source()
+    return (
+        'window.__javmeta_define = function() {\n' + body + '\n};\n'
+        'window.__javmeta_define();\n'
+        "document.addEventListener('DOMContentLoaded', window.__javmeta_define);"
+    )
+
+
 def sanitize_filename(name, max_bytes=240):
     """统一替换非法字符，去首尾空格和点；按 macOS 255 字节文件名上限截断
     （预留扩展名位置，240 字节截断，UTF-8 字符边界安全）"""
@@ -92,6 +117,9 @@ class BrowserController:
             accept_downloads=True,
             ignore_default_args=IGNORE_DEFAULT_ARGS,
         )
+        # Python 自注入页面层脚本，窗口接口与油猴版一致
+        if self.config.get('inject_userscript', True) and os.path.exists(USERSCRIPT_PATH):
+            self.context.add_init_script(build_init_script())
         self.context.set_default_timeout(self.config['timeout'])
 
     def close(self):

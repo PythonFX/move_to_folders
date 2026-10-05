@@ -12,6 +12,7 @@ DEFAULT_CONFIG = {
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.chrome-profile'),
     'detail_url_template': 'https://www.javbus.com/{number}',
     'skip_processed': True,
+    'inject_userscript': True,  # Python 自注入页面层脚本(不依赖 Tampermonkey)
 }
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
