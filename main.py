@@ -195,7 +195,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText("无效的文件夹路径")
             return
         self.download_covers_button.setEnabled(False)
-        self.status_label.setText("封面下载中（浏览器自动打开 javbus，每部间隔3秒）...")
+        self.status_label.setText("封面下载中（后台静默进行，每部间隔3秒）...")
         self.cover_worker = CoverDownloadWorker(folder_path)
         self.cover_worker.progress.connect(lambda msg: self.status_label.setText(f'封面: {msg}'))
         self.cover_worker.done.connect(self._on_cover_download_done)

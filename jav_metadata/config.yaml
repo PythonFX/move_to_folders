@@ -3,7 +3,7 @@ movie_root: "/Volumes/XSK/==new==/==new=="   # 扫描根目录，也可用 CLI -
 retry_count: 3
 timeout: 30000                # 页面加载/evaluate 超时 (ms)
 download_delay: 3             # 每部之间的间隔秒数（低频稳定优先）
-headless: false               # 设计文档要求 headed 模式
+headless: true                # 后台静默运行，不弹窗不抢焦点（profile 里已过人机验证，无头可正常工作）
 close_tab_after_download: true
 chrome_profile_dir: "/Users/vincent/Projects/PyCharm/move_to_folders/.chrome-profile"   # 专用 Chrome Profile（勿与日常 Chrome 混用）
 detail_url_template: "https://www.javbus.com/{number}"

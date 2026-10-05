@@ -6,7 +6,7 @@ DEFAULT_CONFIG = {
     'retry_count': 3,
     'timeout': 30000,
     'download_delay': 3,
-    'headless': False,
+    'headless': True,
     'close_tab_after_download': True,
     'chrome_profile_dir': os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.chrome-profile'),
