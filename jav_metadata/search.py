@@ -65,7 +65,7 @@ def get_magnets_for_numbers(config, numbers, logger=None, progress=None):
     批量提取磁力列表：共用一个浏览器实例，逐片开标签页，
     片与片之间间隔 download_delay 秒（模拟真人，防封）。
     progress(done, total, number) 每完成一片回调。
-    返回 {number: [magnet, ...]}
+    返回 {number: [magnet, ...]}；提取失败的番号值为 None（区别于"页面无磁力"的空列表）
     """
     results = {}
     delay = config.get('download_delay', 3)
@@ -81,7 +81,7 @@ def get_magnets_for_numbers(config, numbers, logger=None, progress=None):
                 if logger:
                     logger.info(f'{number}: {len(results[number])} magnet(s)')
             except Exception as e:
-                results[number] = []
+                results[number] = None
                 if logger:
                     logger.info(f'{number}: ERROR {e}')
             finally:

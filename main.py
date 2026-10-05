@@ -73,6 +73,8 @@ class CollectLinksWorker(QThread):
         from jav_metadata.search import collect_search_numbers, get_magnets_for_numbers
         from jav_metadata.magnet_filter import load_rules, select_magnets
         from jav_metadata.md_output import append_batch, dated_md_path
+        from jav_metadata.collect_state import (load_collect_state, filter_uncollected,
+                                                mark_collected)
 
         try:
             config = load_config()
@@ -89,18 +91,35 @@ class CollectLinksWorker(QThread):
                     max_pages=None if self.search_all_pages else 1)
                 self.progress.emit(f'搜索完成, 共 {len(numbers)} 部, 开始逐部提取下载列表...')
 
+            # 多次运行时跳过已成功提取的番号
+            state = load_collect_state()
+            numbers, skipped = filter_uncollected(numbers, state)
+            if skipped:
+                self.progress.emit(f'跳过 {len(skipped)} 部已提取, 剩余 {len(numbers)} 部...')
+            if not numbers:
+                self.done.emit('', f'全部 {len(skipped)} 部均已提取过, 无需重复操作')
+                return
+
             def on_progress(done, total, number):
                 self.progress.emit(f'提取中 {done}/{total}: {number}')
 
             magnets_map = get_magnets_for_numbers(config, numbers, logger=logger,
                                                   progress=on_progress)
-            entries = [{'number': n, 'sections': select_magnets(magnets_map.get(n, []), n, rules)}
-                       for n in numbers]
+            # 提取失败(None)的不计入断点,下次运行自动重试
+            succeeded = [n for n in numbers if magnets_map.get(n) is not None]
+            entries = [{'number': n, 'sections': select_magnets(magnets_map[n], n, rules)}
+                       for n in succeeded]
+            matched_map = {e['number']: any(e['sections'].values()) for e in entries}
+            mark_collected(succeeded, matched_map, state)
 
+            if not entries:
+                self.done.emit('', '没有成功提取的番号(全部失败,可重试)')
+                return
             md_path = append_batch(dated_md_path(self.folder_path), self.input_text,
                                    entries, rules)
-            matched = sum(1 for e in entries if any(e['sections'].values()))
-            self.done.emit(md_path, f'完成: {len(entries)} 部, {matched} 部有匹配链接')
+            matched = sum(1 for m in matched_map.values() if m)
+            skip_note = f', 跳过已提取 {len(skipped)} 部' if skipped else ''
+            self.done.emit(md_path, f'完成: 新提取 {len(entries)} 部, {matched} 部有匹配链接{skip_note}')
         except Exception as e:
             self.done.emit('', f'收集出错: {e}')
 

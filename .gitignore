@@ -10,4 +10,5 @@ __pycache__
 .chrome-profile/
 extensions/
 jav_metadata/state.json
+jav_metadata/collect_state.json
 jav_metadata/logs/
